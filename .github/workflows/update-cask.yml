@@ -1,0 +1,95 @@
+name: Update Mooziac Cask
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+  repository_dispatch:
+    types: [update-cask]
+
+jobs:
+  update-cask:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout Tap Repository
+        uses: actions/checkout@v4
+
+      - name: Check and Update Cask
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          
+          # Fetch latest release data from upstream repository
+          RELEASE_JSON=$(gh release view --repo shirkeharsh/mooziac --json tagName,assets)
+          
+          python3 - << 'EOF'
+          import json, os, re, subprocess, sys
+
+          release_json = os.environ.get("RELEASE_JSON", "")
+          if not release_json:
+              print("No release data found.")
+              sys.exit(1)
+
+          data = json.loads(release_json)
+          tag = data.get("tagName", "")
+          version = tag.lstrip("v")
+          
+          dmg_asset = next((a for a in data.get("assets", []) if a.get("name") == "Mooziac.dmg"), None)
+          if not dmg_asset:
+              print(f"Error: Mooziac.dmg asset not found in release {tag}")
+              sys.exit(1)
+
+          digest = dmg_asset.get("digest", "")
+          if digest.startswith("sha256:"):
+              sha256 = digest.split("sha256:")[1]
+          elif digest:
+              sha256 = digest
+          else:
+              # Compute sha256 via download if digest field is absent
+              print("Digest not provided directly in API, downloading DMG to compute SHA256...")
+              url = f"https://github.com/shirkeharsh/mooziac/releases/download/{tag}/Mooziac.dmg"
+              res = subprocess.check_output(f"curl -sL '{url}' | shasum -a 256", shell=True).decode()
+              sha256 = res.split()[0]
+
+          cask_path = "Casks/mooziac.rb"
+          with open(cask_path, "r", encoding="utf-8") as f:
+              content = f.read()
+
+          cur_ver_match = re.search(r'version\s+"([^"]+)"', content)
+          cur_sha_match = re.search(r'sha256\s+"([^"]+)"', content)
+
+          current_version = cur_ver_match.group(1) if cur_ver_match else None
+          current_sha = cur_sha_match.group(1) if cur_sha_match else None
+
+          print(f"Current Cask: version={current_version}, sha256={current_sha}")
+          print(f"Upstream:     version={version}, sha256={sha256}")
+
+          if current_version == version and current_sha == sha256:
+              print("Cask is already up-to-date.")
+              with open(os.environ.get("GITHUB_ENV", "/dev/null"), "a") as env_file:
+                  env_file.write("UPDATED=false\n")
+              sys.exit(0)
+
+          new_content = re.sub(r'version\s+"[^"]+"', f'version "{version}"', content)
+          new_content = re.sub(r'sha256\s+"[^"]+"', f'sha256 "{sha256}"', new_content)
+
+          with open(cask_path, "w", encoding="utf-8") as f:
+              f.write(new_content)
+
+          print(f"Successfully updated {cask_path} to {version}!")
+          with open(os.environ.get("GITHUB_ENV", "/dev/null"), "a") as env_file:
+              env_file.write(f"UPDATED=true\nVERSION={version}\n")
+          EOF
+
+      - name: Commit and Push Changes
+        if: env.UPDATED == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Casks/mooziac.rb
+          git commit -m "chore(cask): bump mooziac to ${{ env.VERSION }}"
+          git push origin main
