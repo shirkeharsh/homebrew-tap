@@ -24,7 +24,7 @@ jobs:
           set -e
           
           # Fetch latest release data from upstream repository
-          RELEASE_JSON=$(gh release view --repo shirkeharsh/mooziac --json tagName,assets)
+          export RELEASE_JSON=$(gh release view --repo shirkeharsh/mooziac --json tagName,assets)
           
           python3 - << 'EOF'
           import json, os, re, subprocess, sys
