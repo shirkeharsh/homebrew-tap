@@ -5,7 +5,7 @@ cask "mooziac" do
   url "https://github.com/shirkeharsh/mooziac/releases/download/v#{version}/Mooziac.dmg"
   name "Mooziac"
   desc "Menu bar music player for YouTube Music and local audio"
-  homepage "https://mooziac.threeten.site"
+  homepage "https://mooziac.threeten.site/"
 
   livecheck do
     url :url
