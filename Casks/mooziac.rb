@@ -1,6 +1,6 @@
 cask "mooziac" do
-  version "1.2.5"
-  sha256 "3c3d5302f51e0d6def6ab89cde4977dd9ed7a389dd5e44a9192c63cd959d834e"
+  version "1.2.6"
+  sha256 "d8a41eddfc0ceb882a120b7fceabdb2e3e6b952cf4c63cd4282616b48c31b068"
 
   url "https://github.com/shirkeharsh/mooziac/releases/download/v#{version}/Mooziac.dmg"
   name "Mooziac"
